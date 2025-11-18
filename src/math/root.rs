@@ -11,9 +11,9 @@ pub struct Solver {
 impl Solver {
     pub fn new() -> Self {
         Self {
-            maxiter: 100,
-            atol: 1e-15,
-            rtol: 1e-16,
+            maxiter: 50,
+            atol: 1e-16,
+            rtol: 4.0 * Real::EPSILON,
         }
     }
 
@@ -33,7 +33,7 @@ impl Solver {
 
         for i in 1..=self.maxiter {
             let c = bracket.propose();
-                        
+                     
             let proposal = FnGraph::lift(&f, c);
 
             if self.is_zero(&proposal) {
@@ -52,6 +52,44 @@ impl Solver {
         };
         Err(out)
     }
+
+    pub fn solve_with_jac(&self, f: impl Fn(Real) -> Real, df : impl Fn(Real) -> Real, a: Real, b: Real) -> Result<Solution, SolveError> {
+        let left = FnGraph::lift(&f, a);
+        let right = FnGraph::lift(&f, b);
+
+        if self.is_zero(&left) {
+            return Ok(Solution::from_graph(left, 0));
+        }
+
+        if self.is_zero(&right) {
+            return Ok(Solution::from_graph(right, 0));
+        }
+
+        let mut bracket = Bracket::make(left, right)?;
+
+        for i in 1..=self.maxiter {
+            
+            let c = bracket.propose_with_jac(&df);
+              
+            let proposal = FnGraph::lift(&f, c);
+
+            if self.is_zero(&proposal) {
+                return Ok(Solution::from_graph(proposal, i));
+            }
+
+            if self.is_close(&bracket) {
+                return Ok(Solution::from_graph(proposal, i));
+            }
+
+            bracket.update(proposal);
+        }
+
+        let out = SolveError {
+            message: format!("Reached maximum iterations: {}", self.maxiter),
+        };
+        Err(out)
+    }
+
 
     fn is_zero(&self, p: &FnGraph) -> bool {
         p.y.abs() < self.atol + self.rtol * p.x.abs()
@@ -85,20 +123,20 @@ impl Bracket {
     fn make(left: FnGraph, right: FnGraph) -> Result<Self, SolveError> {
         if same_sign(left.y, right.y) {
             return Err(SolveError {
-                message: "Invalid Bracket".to_string(),
+                message: format!("Invalid Bracket: ({}, {}), ({}, {})", left.x, left.y, right.x, right.y),
             });
         }   
         if left.y.abs() < right.y.abs() {
-            Ok(Self {last : left, best : left, contrapoint: right} )
+            Ok(Self {last : right, best : left, contrapoint: right} )
         } else {
-            Ok(Self {last : right, best : right, contrapoint: left})
+            Ok(Self {last : left, best : right, contrapoint: left})
         }       
     }
 
     fn update(&mut self, proposal: FnGraph) {
         self.last = self.best; 
         self.best = proposal;
-        if same_sign(self.last.y, proposal.y) {
+        if !same_sign(self.last.y, self.best.y) {
             self.contrapoint = self.last;   
         }
         if self.contrapoint.y.abs() < self.best.y.abs() {
@@ -126,12 +164,22 @@ impl Bracket {
         }
     }
     
+    fn propose_with_jac(&self, df : impl Fn(Real) -> Real) -> Real {
+        let mid = self.midpoint();
+        let s = self.best.x - self.best.y / df(self.best.x);
+        if is_between(s, self.best.x, self.contrapoint.x) {
+            s
+        } else {
+            mid
+        }
+    }
+
     fn width(&self) -> Real {
         (self.best.x - self.contrapoint.x).abs()
     }
     
     fn norm(&self) -> Real {
-        self.best.x.abs().max(self.contrapoint.x.abs())
+        Real::max(self.best.x.abs(), self.contrapoint.x.abs())
     }
 }
 
@@ -142,7 +190,7 @@ fn same_sign(x: Real, y: Real) -> bool {
 fn is_between(x : Real, a :Real, b : Real) -> bool {
     let l = a < x;
     let r = x < b;
-    l ^ r
+    !(l ^ r)
 }
 
 
