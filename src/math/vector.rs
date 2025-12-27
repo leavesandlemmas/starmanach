@@ -1,61 +1,79 @@
-use crate::math::real::{Real, PI};
 // standard imports
-
 use std::fmt;
-use std::ops;
+use std::ops::{Add, AddAssign};
+use std::ops::{Sub, SubAssign};
 
+type Scalar = f64;
 
-type Vec2 = Vec<2>;
-type Vec3 = Vec<3>;
-
-pub struct Vec<const DIM: usize> {
-    arr: [Real; DIM],
+#[derive(Debug)]
+pub struct Vector <const DIM: usize> {
+    data : [Scalar; DIM],
 }
 
 
-impl<const DIM: usize> Vec<{DIM}> {
+impl<const DIM:usize> Vector<DIM> {
     
-    pub fn iter(&self) -> impl Iterator {
-        self.arr.iter()
+    pub fn dot(&self, other : Self) -> Scalar {
+        let mut acc : Scalar = 0.0;
+        for i in 0..DIM {
+            acc += self.data[i] * other.data[i];
+        }
+        acc
+    }
+}
+
+type Vector2f = Vector<2>;
+type Vector3f = Vector<3>;
+type Vector4f = Vector<4>;
+
+
+impl<const DIM: usize> Add for Vector<DIM> {
+    type Output = Vector<DIM>;
+    
+    fn add(self, other : Self) -> Self::Output {
+        let mut data : [Scalar; DIM] = self.data;
+        for i in 0..DIM {
+            data[i] += other.data[i];
+        }
+        Self::Output {data}
     }
     
-
-//    pub fn from_binary(f : impl Fn(Real, Real) -> Real, u : Self, v : Self) -> Self {
-//        let mut arr : [Real, DIM];
-//        for i in 0..DIM {
-//            *arr[i] = f(u.arr[i], v.arr[i]); 
-//        }        
-//        Self {arr}
-//    }
-
 }
 
-impl<const DIM: usize> ops::Index<usize> for Vec<{DIM}> {
-    type Output = Real;
 
-    fn index(&self, i: usize) -> &Self::Output {
-        &self.arr[i]
+impl<const DIM: usize> AddAssign for Vector<DIM> {
+
+    fn add_assign(&mut self, other : Self) {
+        for i in 0..DIM {
+            self.data[i] += other.data[i];
+        }
     }
+    
 }
 
-
-impl<const DIM: usize> ops::IndexMut<usize> for Vec<{DIM}> {
-    type Output = Real;
-
-    fn index_mut(&mut self, i: usize) -> &mut Self::Output {
-        &mut self.arr[i]
+impl<const DIM: usize> Sub for Vector<DIM> {
+    type Output = Vector<DIM>;
+    
+    fn sub(self, other : Self) -> Self::Output {
+        let mut data : [Scalar; DIM] = self.data;
+        for i in 0..DIM {
+            data[i] -= other.data[i];
+        }
+        Self::Output {data}
     }
+    
 }
 
-//impl<const DIM: usize> ops::Add for Vec<{DIM}> {
-//    type Output = Self;
-//
-//    fn add(self, other: Self) -> Self {
-//        let pairs =  self.arr.iter().zip(other.arr.iter());
-//        let mut arr: [Real; DIM];
-//        for (i, val) in pairs.map(|(x, y)| x + y).enumerate() {
-//            arr[i] = val;
-//        }
-//        Self { arr }
-//    }
-//}
+impl<const DIM: usize> SubAssign for Vector<DIM> {
+
+    fn sub_assign(&mut self, other : Self) {
+        for i in 0..DIM {
+            self.data[i] -= other.data[i];
+        }
+    }
+    
+}
+
+
+
+
